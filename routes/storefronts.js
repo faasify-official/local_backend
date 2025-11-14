@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid')
 const router = express.Router()
 const STOREFRONTS_TABLE = process.env.STOREFRONTS_TABLE || 'StorefrontsTable'
 const USERS_TABLE = process.env.USERS_TABLE || 'UsersTable'
+const ITEMS_TABLE = process.env.ITEMS_TABLE || 'ItemsTable'
 
 // Create storefront
 router.post('/', async (req, res) => {
@@ -38,7 +39,7 @@ router.post('/', async (req, res) => {
       category,
       image: image || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1400&q=80',
       owner: user.userId,
-      ownerName: user.email,
+      ownerName: user.name,
       items: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -84,8 +85,53 @@ router.get('/', async (req, res) => {
       })
     )
 
+    const storefronts = result.Items || []
+
+    // Enrich storefronts with items counts
+    const enrichedStorefronts = await Promise.all(
+      storefronts.map(async (storefront) => {
+        // Get items count from ItemsTable
+        let itemsCount = 0
+        try {
+          // Try to query using StoreIdIndex GSI first
+          let itemsResult
+          try {
+            itemsResult = await docClient.send(
+              new QueryCommand({
+                TableName: ITEMS_TABLE,
+                IndexName: 'StoreIdIndex',
+                KeyConditionExpression: 'storeId = :storeId',
+                ExpressionAttributeValues: {
+                  ':storeId': storefront.storeId,
+                },
+              })
+            )
+          } catch (gsiError) {
+            // If GSI doesn't exist, fall back to scanning and filtering
+            itemsResult = await docClient.send(
+              new ScanCommand({
+                TableName: ITEMS_TABLE,
+                FilterExpression: 'storeId = :storeId',
+                ExpressionAttributeValues: {
+                  ':storeId': storefront.storeId,
+                },
+              })
+            )
+          }
+          itemsCount = itemsResult.Items ? itemsResult.Items.length : 0
+        } catch (itemsError) {
+          console.warn(`Failed to fetch items for storefront ${storefront.storeId}:`, itemsError.message)
+        }
+
+        return {
+          ...storefront,
+          itemsCount,
+        }
+      })
+    )
+
     res.status(200).json({
-      storefronts: result.Items || [],
+      storefronts: enrichedStorefronts,
     })
   } catch (error) {
     console.error('Error listing storefronts:', error)
