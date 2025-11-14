@@ -17,6 +17,7 @@ app.use('/listings', require('./routes/listings'))
 app.use('/cart', require('./routes/cart'))
 app.use('/orders', require('./routes/orders'))
 app.use('/reviews', require('./routes/reviews'))
+app.use('/subscriptions', require('./routes/subscriptions'))
 
 // Health check
 app.get('/health', (req, res) => {
@@ -56,5 +57,8 @@ app.listen(PORT, () => {
   console.log(`   - POST   /reviews`)
   console.log(`   - GET    /reviews/product/:productId`)
   console.log(`   - GET    /reviews/:reviewId`)
+  console.log(`   - POST   /subscriptions/subscribe`)
+  console.log(`   - POST   /subscriptions/unsubscribe`)
+  console.log(`   - GET    /subscriptions/:storeId`)
 })
 
