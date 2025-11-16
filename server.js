@@ -18,6 +18,7 @@ app.use('/cart', require('./routes/cart'))
 app.use('/orders', require('./routes/orders'))
 app.use('/reviews', require('./routes/reviews'))
 app.use('/subscriptions', require('./routes/subscriptions'))
+app.use('/payments', require('./routes/payments'))
 
 // Health check
 app.get('/health', (req, res) => {
