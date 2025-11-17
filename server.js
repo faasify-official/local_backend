@@ -48,6 +48,7 @@ app.listen(PORT, () => {
   console.log(`   - GET    /storefronts/my`)
   console.log(`   - POST   /listings`)
   console.log(`   - GET    /listings?storeId=...`)
+  console.log(`   - GET    /listings/:id`)
   console.log(`   - GET    /cart`)
   console.log(`   - POST   /cart`)
   console.log(`   - PUT    /cart/:storeId/:productId`)

@@ -1,6 +1,6 @@
 const express = require('express')
 const { docClient } = require('../utils/dynamodb')
-const { PutCommand, QueryCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb')
+const { PutCommand, QueryCommand, ScanCommand, GetCommand } = require('@aws-sdk/lib-dynamodb')
 const { v4: uuidv4 } = require('uuid')
 
 const router = express.Router()
@@ -109,6 +109,41 @@ router.get('/', async (req, res) => {
   } catch (error) {
     console.error('Error getting items:', error)
     res.status(500).json({ error: `Failed to get items: ${error.message}` })
+  }
+})
+
+// Get single item by ID (must come after / route)
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+
+    console.log('Getting item by ID:', id)
+
+    if (!id) {
+      return res.status(400).json({ error: 'Missing item ID' })
+    }
+
+    const result = await docClient.send(
+      new GetCommand({
+        TableName: ITEMS_TABLE,
+        Key: {
+          id,
+        },
+      })
+    )
+
+    if (!result.Item) {
+      console.log('Item not found in database:', id)
+      return res.status(404).json({ error: 'Item not found' })
+    }
+
+    console.log('Item found:', result.Item.id)
+    res.status(200).json({
+      item: result.Item,
+    })
+  } catch (error) {
+    console.error('Error getting item:', error)
+    res.status(500).json({ error: `Failed to get item: ${error.message}` })
   }
 })
 
