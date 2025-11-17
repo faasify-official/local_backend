@@ -16,7 +16,7 @@ router.post('/', async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' })
     }
 
-    const { items, shippingInfo, paymentIntentId, amount, currency } = req.body
+    const { items, shippingInfo, paymentIntentId, amount, currency, storeId } = req.body
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Items are required' })
@@ -31,6 +31,7 @@ router.post('/', async (req, res) => {
       currency,
       stripePaymentIntentId: paymentIntentId,
       shippingInfo,
+      storeId: storeId || 'default-store',
       status: 'PAID',
       createdAt: new Date().toISOString(),
     }
@@ -96,7 +97,7 @@ router.get('/:orderId', async (req, res) => {
       new GetCommand({
         TableName: ORDERS_TABLE,
         Key: {
-          orderId,
+          id: orderId,
         },
       })
     )

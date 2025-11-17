@@ -17,19 +17,27 @@ router.post('/', async (req, res) => {
 
     const { productId, rating, comment, storeId } = req.body
 
-    if (!productId || !rating || !storeId) {
-      return res.status(400).json({ error: 'Missing required fields: productId, rating, storeId' })
+    // if (!productId || !rating || !storeId) {
+    //   return res.status(400).json({ error: 'Missing required fields: productId, rating, storeId' })
+    // }
+
+    if (!productId || typeof rating !== 'number') {
+      return res
+        .status(400)
+        .json({ error: 'Missing required fields: productId, rating' });
     }
 
     if (rating < 1 || rating > 5) {
       return res.status(400).json({ error: 'Rating must be between 1 and 5' })
     }
 
+    const resolvedStoreId = storeId || 'default-store';
+
     const reviewId = uuidv4()
     const review = {
       reviewId,
       productId,
-      storeId,
+      storeId: resolvedStoreId,
       userId: user.userId,
       reviewer: user.email || user.name,
       rating,
