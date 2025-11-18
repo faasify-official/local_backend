@@ -17,7 +17,6 @@ router.post('/', async (req, res) => {
     }
 
     const { items, shippingInfo, paymentIntentId, amount, currency, storeId } = req.body
-
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Items are required' })
     }
