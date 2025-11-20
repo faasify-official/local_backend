@@ -12,7 +12,7 @@ const ITEMS_TABLE = process.env.ITEMS_TABLE || 'ItemsTable'
 // Create storefront
 router.post('/', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized: Invalid or missing token' })
     }
@@ -142,7 +142,7 @@ router.get('/', async (req, res) => {
 // Get my storefronts (seller's own storefronts) - MUST come before /:storeId
 router.get('/my', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized: Invalid or missing token' })
     }

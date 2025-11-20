@@ -9,7 +9,7 @@ const SUBSCRIPTIONS_TABLE = process.env.SUBSCRIPTIONS_TABLE || 'SubscriptionsTab
 // Subscribe to a storefront
 router.post('/subscribe', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized: Invalid or missing token' })
     }
@@ -80,7 +80,7 @@ router.post('/subscribe', async (req, res) => {
 // Unsubscribe from a storefront
 router.post('/unsubscribe', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized: Invalid or missing token' })
     }

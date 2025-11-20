@@ -11,7 +11,7 @@ const CART_TABLE = process.env.CART_TABLE || 'CartTable'
 // Create order
 router.post('/', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
@@ -58,7 +58,7 @@ router.post('/', async (req, res) => {
 // Get user's orders
 router.get('/', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
@@ -85,7 +85,7 @@ router.get('/', async (req, res) => {
 // Get single order
 router.get('/:orderId', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
