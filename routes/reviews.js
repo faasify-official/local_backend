@@ -10,7 +10,7 @@ const REVIEWS_TABLE = process.env.REVIEWS_TABLE || 'ReviewsTable'
 // Create review
 router.post('/', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' })
     }

@@ -9,7 +9,7 @@ const CART_TABLE = process.env.CART_TABLE || 'CartTable'
 // Get user's cart
 router.get('/', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
@@ -37,7 +37,7 @@ router.get('/', async (req, res) => {
 // Add item to cart
 router.post('/', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
@@ -76,7 +76,7 @@ router.post('/', async (req, res) => {
 // Update cart item
 router.put('/:storeId/:productId', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
@@ -116,7 +116,7 @@ router.put('/:storeId/:productId', async (req, res) => {
 // Remove item from cart
 router.delete('/:storeId/:productId', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' })
     }

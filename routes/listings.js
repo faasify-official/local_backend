@@ -165,7 +165,7 @@ router.get('/:id', async (req, res) => {
 // Update item (must come after /:id route)
 router.put('/:id', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
@@ -273,7 +273,7 @@ router.put('/:id', async (req, res) => {
 // Delete item
 router.delete('/:id', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' })
     }

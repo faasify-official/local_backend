@@ -4,12 +4,12 @@ const { verifyToken } = require('../utils/jwt')
 const router = express.Router()
 
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY , {
-    apiVersion: '2024-06-20',
-  })
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2024-06-20',
+})
 
 router.post('/create-payment-intent', async (req, res) => {
-  const user = verifyToken(req)
+  const user = await verifyToken(req)
   if (!user) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
@@ -34,8 +34,8 @@ router.post('/create-payment-intent', async (req, res) => {
     // console.log('Payment intent created:', paymentIntent)
 
     return res.status(200).json({
-        clientSecret: paymentIntent.client_secret,
-      })
+      clientSecret: paymentIntent.client_secret,
+    })
 
   } catch (error) {
     console.error('Error creating payment intent:', error)

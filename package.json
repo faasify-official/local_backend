@@ -9,6 +9,7 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.936.0",
     "@aws-sdk/client-dynamodb": "^3.592.0",
     "@aws-sdk/lib-dynamodb": "^3.592.0",
     "bcryptjs": "^2.4.3",
@@ -16,6 +17,7 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
+    "jwk-to-pem": "^2.0.7",
     "stripe": "^19.3.1",
     "uuid": "^9.0.1"
   }

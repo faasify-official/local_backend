@@ -12,12 +12,24 @@ const ITEMS_TABLE = process.env.ITEMS_TABLE || 'ItemsTable'
 // Create storefront
 router.post('/', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized: Invalid or missing token' })
     }
 
-    if (user.role !== 'seller') {
+    // Check role (Commented out: If not in token, fetch from DynamoDB using user.userId (Cognito sub))
+    let userRole = user.role
+    // if (!userRole) {
+    //   const userResult = await docClient.send(
+    //     new GetCommand({
+    //       TableName: USERS_TABLE,
+    //       Key: { userId: user.userId }, // Now using Cognito sub
+    //     })
+    //   )
+    //   userRole = userResult.Item?.role
+    // }
+
+    if (userRole !== 'seller') {
       return res.status(403).json({ error: 'Forbidden: Only sellers can create storefronts' })
     }
 
@@ -38,7 +50,7 @@ router.post('/', async (req, res) => {
       description,
       category,
       image: image || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1400&q=80',
-      owner: user.userId,
+      owner: user.userId, // Store Cognito sub as owner
       ownerName: user.name,
       items: [],
       createdAt: new Date().toISOString(),
@@ -52,12 +64,12 @@ router.post('/', async (req, res) => {
       })
     )
 
-    // Update user to mark that they have a storefront
+    // Update user to mark that they have a storefront using Cognito sub
     await docClient.send(
       new UpdateCommand({
         TableName: USERS_TABLE,
         Key: {
-          userId: user.userId,
+          userId: user.userId, // Cognito sub
         },
         UpdateExpression: 'SET hasStorefront = :hasStorefront',
         ExpressionAttributeValues: {
@@ -142,7 +154,7 @@ router.get('/', async (req, res) => {
 // Get my storefronts (seller's own storefronts) - MUST come before /:storeId
 router.get('/my', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized: Invalid or missing token' })
     }
