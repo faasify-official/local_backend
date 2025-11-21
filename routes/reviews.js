@@ -15,7 +15,7 @@ router.post('/', async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' })
     }
 
-    const { productId, rating, comment, storeId } = req.body
+    const { productId, rating, comment, title, storeId } = req.body
 
     // if (!productId || !rating || !storeId) {
     //   return res.status(400).json({ error: 'Missing required fields: productId, rating, storeId' })
@@ -41,6 +41,7 @@ router.post('/', async (req, res) => {
       userId: user.userId,
       reviewer: user.email || user.name,
       rating,
+      title: title || '',
       comment: comment || '',
       createdAt: new Date().toISOString(),
     }

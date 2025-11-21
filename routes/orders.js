@@ -31,7 +31,10 @@ router.post('/', async (req, res) => {
       stripePaymentIntentId: paymentIntentId,
       shippingInfo,
       storeId: storeId || 'default-store',
-      status: 'PAID',
+      status: 'ORDER_CONFIRMED', // Buyer view: Order Confirmed
+      orderStatus: 'PREPARE_ORDER', // Seller view: Prepare Order
+      carrier: null,
+      trackingId: null,
       createdAt: new Date().toISOString(),
     }
 
@@ -82,6 +85,116 @@ router.get('/', async (req, res) => {
   }
 })
 
+// Get orders for seller's storefront
+router.get('/storefront/:storeId', async (req, res) => {
+  try {
+    const user = verifyToken(req)
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    if (user.role !== 'seller') {
+      return res.status(403).json({ error: 'Forbidden: Only sellers can view storefront orders' })
+    }
+
+    const { storeId } = req.params
+
+    const result = await docClient.send(
+      new ScanCommand({
+        TableName: ORDERS_TABLE,
+        FilterExpression: 'storeId = :storeId',
+        ExpressionAttributeValues: {
+          ':storeId': storeId,
+        },
+      })
+    )
+
+    res.status(200).json({
+      orders: result.Items || [],
+    })
+  } catch (error) {
+    console.error('Error getting storefront orders:', error)
+    res.status(500).json({ error: 'Failed to get storefront orders' })
+  }
+})
+
+// Update order status (seller only)
+router.put('/:orderId/status', async (req, res) => {
+  try {
+    const user = verifyToken(req)
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    if (user.role !== 'seller') {
+      return res.status(403).json({ error: 'Forbidden: Only sellers can update order status' })
+    }
+
+    const { orderId } = req.params
+    const { status, carrier, trackingId } = req.body
+
+    // Valid statuses
+    const validStatuses = ['PREPARE_ORDER', 'SHIPPED', 'DELIVERED', 'COMPLETED']
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` })
+    }
+
+    // Get the order first
+    const getResult = await docClient.send(
+      new GetCommand({
+        TableName: ORDERS_TABLE,
+        Key: {
+          id: orderId,
+        },
+      })
+    )
+
+    if (!getResult.Item) {
+      return res.status(404).json({ error: 'Order not found' })
+    }
+
+    // Map seller status to buyer status
+    const statusMap = {
+      'PREPARE_ORDER': 'ORDER_CONFIRMED',
+      'SHIPPED': 'SHIPPED',
+      'DELIVERED': 'DELIVERED',
+      'COMPLETED': 'COMPLETED'
+    }
+
+    const buyerStatus = statusMap[status] || 'ORDER_CONFIRMED'
+
+    // Update order
+    const updatedOrder = {
+      ...getResult.Item,
+      status: buyerStatus,
+      orderStatus: status,
+    }
+
+    // Add carrier and trackingId if provided
+    if (carrier !== undefined) {
+      updatedOrder.carrier = carrier
+    }
+    if (trackingId !== undefined) {
+      updatedOrder.trackingId = trackingId
+    }
+
+    await docClient.send(
+      new PutCommand({
+        TableName: ORDERS_TABLE,
+        Item: updatedOrder,
+      })
+    )
+
+    res.status(200).json({
+      message: 'Order status updated successfully',
+      order: updatedOrder,
+    })
+  } catch (error) {
+    console.error('Error updating order status:', error)
+    res.status(500).json({ error: 'Failed to update order status' })
+  }
+})
+
 // Get single order
 router.get('/:orderId', async (req, res) => {
   try {
@@ -105,7 +218,11 @@ router.get('/:orderId', async (req, res) => {
       return res.status(404).json({ error: 'Order not found' })
     }
 
-    if (result.Item.userId !== user.userId) {
+    // Check if user is buyer or seller (seller can view if order is for their storefront)
+    const isBuyer = result.Item.userId === user.userId
+    const isSeller = user.role === 'seller' && result.Item.storeId
+
+    if (!isBuyer && !isSeller) {
       return res.status(403).json({ error: 'Forbidden' })
     }
 
