@@ -1,12 +1,13 @@
 const express = require('express')
+const crypto = require('crypto')
 const { docClient } = require('../utils/dynamodb')
 const { PutCommand, GetCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb')
 const {
   CognitoIdentityProviderClient,
   AdminCreateUserCommand,
   AdminSetUserPasswordCommand,
-  AdminAddUserToGroupCommand,
-  InitiateAuthCommand,
+  AdminInitiateAuthCommand,
+  AdminGetUserCommand,
 } = require('@aws-sdk/client-cognito-identity-provider')
 const { verifyToken } = require('../utils/jwt')
 
@@ -20,9 +21,21 @@ const cognito = new CognitoIdentityProviderClient({
 
 const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID
 const COGNITO_CLIENT_ID = process.env.COGNITO_CLIENT_ID
+const COGNITO_CLIENT_SECRET = process.env.COGNITO_CLIENT_SECRET
 
 if (!COGNITO_USER_POOL_ID || !COGNITO_CLIENT_ID) {
   console.warn('WARNING: COGNITO_USER_POOL_ID or COGNITO_CLIENT_ID not set in .env')
+}
+
+// Compute SECRET_HASH for Cognito (required when client has a secret)
+const computeSecretHash = (username, clientId, clientSecret) => {
+  if (!clientSecret) {
+    return undefined
+  }
+  return crypto
+    .createHmac('SHA256', clientSecret)
+    .update(username + clientId)
+    .digest('base64')
 }
 
 // Register
@@ -48,6 +61,7 @@ router.post('/register', async (req, res) => {
     }
 
     // Create user in Cognito
+    let cognitoSub
     try {
       await cognito.send(
         new AdminCreateUserCommand({
@@ -57,6 +71,7 @@ router.post('/register', async (req, res) => {
             { Name: 'email', Value: email.toLowerCase() },
             { Name: 'name', Value: name },
             { Name: 'email_verified', Value: 'true' },
+            { Name: 'custom:role', Value: role }, // Store role as custom attribute
           ],
           TemporaryPassword: password,
           MessageAction: 'SUPPRESS', // Don't send welcome email
@@ -73,14 +88,21 @@ router.post('/register', async (req, res) => {
         })
       )
 
-      // Add user to group (buyer or seller)
-      await cognito.send(
-        new AdminAddUserToGroupCommand({
+      // Get the user to retrieve the Cognito sub
+      const getUserResponse = await cognito.send(
+        new AdminGetUserCommand({
           UserPoolId: COGNITO_USER_POOL_ID,
           Username: email.toLowerCase(),
-          GroupName: role, // Group name = buyer or seller
         })
       )
+
+      // Extract sub from user attributes
+      const subAttr = getUserResponse.UserAttributes.find((attr) => attr.Name === 'sub')
+      cognitoSub = subAttr?.Value
+
+      if (!cognitoSub) {
+        throw new Error('Failed to retrieve Cognito sub')
+      }
     } catch (cognitoError) {
       console.error('Cognito registration error:', cognitoError.message)
       if (cognitoError.name === 'UsernameExistsException') {
@@ -89,10 +111,9 @@ router.post('/register', async (req, res) => {
       return res.status(500).json({ error: `Cognito error: ${cognitoError.message}` })
     }
 
-    // Create user record in DynamoDB (metadata: hasStorefront, createdAt, etc.)
-    const userId = email.toLowerCase() // Use email as userId for consistency
+    // Create user record in DynamoDB using Cognito sub as userId (partition key)
     const user = {
-      userId,
+      userId: cognitoSub, // Use Cognito sub as partition key
       email: email.toLowerCase(),
       name,
       role,
@@ -133,24 +154,39 @@ router.post('/login', async (req, res) => {
     }
 
     try {
-      // Authenticate with Cognito
+      // Authenticate with Cognito using AdminInitiateAuth
+      // This is an admin operation and doesn't depend on client auth flows
+      const authParams = {
+        USERNAME: email.toLowerCase(),
+        PASSWORD: password,
+      }
+
+      // Add SECRET_HASH if client secret is configured
+      const secretHash = computeSecretHash(email.toLowerCase(), COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET)
+      if (secretHash) {
+        authParams.SECRET_HASH = secretHash
+      }
+
       const authResponse = await cognito.send(
-        new InitiateAuthCommand({
+        new AdminInitiateAuthCommand({
+          UserPoolId: COGNITO_USER_POOL_ID,
           ClientId: COGNITO_CLIENT_ID,
           AuthFlow: 'ADMIN_NO_SRP_AUTH',
-          AuthParameters: {
-            USERNAME: email.toLowerCase(),
-            PASSWORD: password,
-          },
+          AuthParameters: authParams,
         })
       )
 
-      // Get user from DynamoDB for additional metadata
+      // Extract sub from the ID token to use as userId
+      const idToken = authResponse.AuthenticationResult.IdToken
+      const decoded = require('jsonwebtoken').decode(idToken)
+      const cognitoSub = decoded.sub
+
+      // Get user from DynamoDB using Cognito sub as userId
       const userResult = await docClient.send(
         new GetCommand({
           TableName: USERS_TABLE,
           Key: {
-            userId: email.toLowerCase(),
+            userId: cognitoSub,
           },
         })
       )
@@ -190,6 +226,7 @@ router.post('/login', async (req, res) => {
 })
 
 // Get Profile
+// NOTE: There's redundant code between Cognito & Dynamo. For simplicity, we fetch all profile attributes from Dynamo since user's info is stored there anyways!!!
 router.get('/profile', async (req, res) => {
   try {
     const user = await verifyToken(req)
@@ -197,24 +234,38 @@ router.get('/profile', async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized: No token provided' })
     }
 
-    // Get user from database
-    const result = await docClient.send(
-      new GetCommand({
-        TableName: USERS_TABLE,
-        Key: {
-          userId: user.userId,
-        },
-      })
-    )
+    // Get user from database using Cognito sub as userId (partition key)
+    let result
+    try {
+      result = await docClient.send(
+        new GetCommand({
+          TableName: USERS_TABLE,
+          Key: {
+            userId: user.userId, // user.userId is now the Cognito sub
+          },
+        })
+      )
+    } catch (error) {
+      console.error('Error fetching user:', error)
+      result = { Item: null }
+    }
 
     if (!result.Item) {
       return res.status(404).json({ error: 'User not found' })
     }
 
-    // Return user data (without password)
-    const { password: _, ...userWithoutPassword } = result.Item
+    // Return full user profile with all attributes
+    const profileData = {
+      userId: result.Item.userId, // Cognito sub
+      email: result.Item.email,
+      name: result.Item.name,
+      role: result.Item.role,
+      hasStorefront: result.Item.hasStorefront || false,
+      createdAt: result.Item.createdAt || new Date().toISOString(),
+    }
+
     res.status(200).json({
-      user: userWithoutPassword,
+      user: profileData,
     })
   } catch (error) {
     if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {

@@ -87,11 +87,15 @@ const verifyToken = async (req) => {
     }
 
     // Extract user info from token
+    // Custom attributes are prefixed with 'custom:' in Cognito tokens
+    // If not available, role will be fetched from DynamoDB when needed
+    const role = verified['custom:role'] || undefined
+    
     return {
-      userId: verified.sub || verified['cognito:username'],
+      userId: verified.sub || verified['cognito:username'], // Should be the same value
       email: verified.email,
       name: verified.name,
-      role: verified['cognito:groups'] ? verified['cognito:groups'][0] : 'buyer', // First group is role
+      role, 
     }
   } catch (error) {
     console.error('Token verification error:', error.message)
@@ -102,35 +106,7 @@ const verifyToken = async (req) => {
 /**
  * Convert JWK to PEM format (for RSA keys)
  */
-function jwkToPem(jwk) {
-  // This is a simplified conversion. For production, use a library like 'jwk-to-pem'
-  // For now, we'll use the RSA key directly via jsonwebtoken's built-in support
-  const crypto = require('crypto')
-
-  if (jwk.kty !== 'RSA') {
-    throw new Error('Only RSA keys are supported')
-  }
-
-  const modulusBuffer = Buffer.from(jwk.n, 'base64')
-  const exponentBuffer = Buffer.from(jwk.e, 'base64')
-
-  const modulusHex = modulusBuffer.toString('hex')
-  const exponentHex = exponentBuffer.toString('hex')
-
-  const modulus = Buffer.from(modulusHex, 'hex')
-  const exponent = Buffer.from(exponentHex, 'hex')
-
-  const publicKey = crypto.createPublicKey({
-    key: {
-      kty: 'RSA',
-      n: modulus,
-      e: exponent,
-    },
-    format: 'jwk',
-  })
-
-  return crypto.createPublicKey(publicKey).export({ format: 'pem', type: 'spki' })
-}
+const jwkToPem = require('jwk-to-pem')
 
 module.exports = { verifyToken }
 
