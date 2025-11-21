@@ -148,7 +148,7 @@ router.post('/unsubscribe', async (req, res) => {
 // Get all subscriptions for a storefront (for sellers/admins)
 router.get('/:storeId', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized: Invalid or missing token' })
     }

@@ -121,7 +121,7 @@ router.get('/storefront/:storeId', async (req, res) => {
 // Update order status (seller only)
 router.put('/:orderId/status', async (req, res) => {
   try {
-    const user = verifyToken(req)
+    const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
