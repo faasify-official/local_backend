@@ -19,6 +19,7 @@ app.use('/orders', require('./routes/orders'))
 app.use('/reviews', require('./routes/reviews'))
 app.use('/subscriptions', require('./routes/subscriptions'))
 app.use('/payments', require('./routes/payments'))
+app.use('/chats', require('./routes/chats'))
 
 // Health check
 app.get('/health', (req, res) => {
@@ -64,5 +65,14 @@ app.listen(PORT, () => {
   console.log(`   - POST   /subscriptions/subscribe`)
   console.log(`   - POST   /subscriptions/unsubscribe`)
   console.log(`   - GET    /subscriptions/:storeId`)
+  console.log(`   - GET    /chats`)
+  console.log(`   - POST   /chats`)
+  console.log(`   - GET    /chats/:chatId`)
+  console.log(`   - GET    /chats/:chatId/messages`)
+  console.log(`   - POST   /chats/:chatId/messages`)
+  console.log(`   - PUT    /chats/:chatId/messages/:messageId/read`)
+  console.log(`   - PUT    /chats/:chatId/read-all`)
+  console.log(`   - DELETE /chats/:chatId`)
+  console.log(`   - GET    /chats/store/:storeId`)
 })
 
