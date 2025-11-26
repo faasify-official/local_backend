@@ -347,8 +347,6 @@ router.get('/:chatId/messages', async (req, res) => {
       ExpressionAttributeValues: {
         ':chatId': chatId,
       },
-      ScanIndexForward: false, // Most recent first
-      Limit: parseInt(limit),
     }
 
     // Add pagination if lastMessageId provided
@@ -361,8 +359,13 @@ router.get('/:chatId/messages', async (req, res) => {
 
     const result = await docClient.send(new QueryCommand(queryParams))
 
+    // Sort messages by createdAt (oldest first for proper chat display)
+    const sortedMessages = result.Items.sort((a, b) => 
+      new Date(a.createdAt) - new Date(b.createdAt)
+    )
+
     res.status(200).json({
-      messages: result.Items,
+      messages: sortedMessages,
       lastEvaluatedKey: result.LastEvaluatedKey,
     })
   } catch (error) {
