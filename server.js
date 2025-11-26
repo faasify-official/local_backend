@@ -21,6 +21,9 @@ app.use('/subscriptions', require('./routes/subscriptions'))
 app.use('/payments', require('./routes/payments'))
 app.use('/chats', require('./routes/chats'))
 
+// Upload route - handle binary file uploads (10MB limit)
+app.use('/upload', express.raw({ type: '*/*', limit: '10mb' }), require('./routes/upload'))
+
 // Health check
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Local backend server is running' })
@@ -74,5 +77,7 @@ app.listen(PORT, () => {
   console.log(`   - PUT    /chats/:chatId/read-all`)
   console.log(`   - DELETE /chats/:chatId`)
   console.log(`   - GET    /chats/store/:storeId`)
+  console.log(`   - POST   /upload (server-side upload)`)
+  console.log(`   - GET    /upload/upload-url (presigned URL - has CORS issues)`)
 })
 
