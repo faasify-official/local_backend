@@ -1,11 +1,12 @@
-// Lambda handler using serverless-express
-const serverlessExpress = require('@vendia/serverless-express')
+// Lambda handler using aws-serverless-express (more reliable than @vendia)
+const awsServerlessExpress = require('aws-serverless-express')
 const app = require('./app')
 
-// Create the serverless-express handler
-// @vendia/serverless-express automatically detects API Gateway events
-// But we can explicitly configure it if needed
-const handler = serverlessExpress({ app })
+// Create server (cached for warm starts)
+const server = awsServerlessExpress.createServer(app, null, ['application/json'])
 
-exports.handler = handler
+// Lambda handler
+exports.handler = (event, context) => {
+  return awsServerlessExpress.proxy(server, event, context)
+}
 
