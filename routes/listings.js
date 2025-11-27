@@ -42,6 +42,9 @@ router.post('/', async (req, res) => {
 
     // Create item
     const itemId = uuidv4()
+    const defaultImage = 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=800&q=80'
+    const finalImage = image && image.trim() !== '' ? image : defaultImage
+    
     const item = {
       id: itemId,
       storeId,
@@ -49,7 +52,7 @@ router.post('/', async (req, res) => {
       description,
       price: priceNum,
       category,
-      image: image || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=800&q=80',
+      image: finalImage,
       quantity: quantityNum,
       averageRating: 0,
       reviews: [],
