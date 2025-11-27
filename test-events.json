@@ -1,0 +1,117 @@
+{
+  "healthCheck": {
+    "resource": "/{proxy+}",
+    "path": "/health",
+    "httpMethod": "GET",
+    "headers": {
+      "Accept": "application/json",
+      "Host": "abc123.execute-api.us-west-2.amazonaws.com"
+    },
+    "queryStringParameters": null,
+    "pathParameters": {
+      "proxy": "health"
+    },
+    "requestContext": {
+      "resourcePath": "/{proxy+}",
+      "httpMethod": "GET",
+      "requestId": "test-request-id",
+      "stage": "prod",
+      "requestTimeEpoch": 1428582896000,
+      "identity": {
+        "sourceIp": "127.0.0.1"
+      },
+      "domainName": "abc123.execute-api.us-west-2.amazonaws.com",
+      "apiId": "abc123"
+    },
+    "body": null,
+    "isBase64Encoded": false
+  },
+  
+  "authLogin": {
+    "resource": "/{proxy+}",
+    "path": "/auth/login",
+    "httpMethod": "POST",
+    "headers": {
+      "Content-Type": "application/json",
+      "Host": "abc123.execute-api.us-west-2.amazonaws.com"
+    },
+    "queryStringParameters": null,
+    "pathParameters": {
+      "proxy": "auth/login"
+    },
+    "requestContext": {
+      "resourcePath": "/{proxy+}",
+      "httpMethod": "POST",
+      "requestId": "test-request-id",
+      "stage": "prod",
+      "requestTimeEpoch": 1428582896000,
+      "identity": {
+        "sourceIp": "127.0.0.1"
+      },
+      "domainName": "abc123.execute-api.us-west-2.amazonaws.com",
+      "apiId": "abc123"
+    },
+    "body": "{\"email\":\"test@example.com\",\"password\":\"test123\"}",
+    "isBase64Encoded": false
+  },
+  
+  "listingsGet": {
+    "resource": "/{proxy+}",
+    "path": "/listings",
+    "httpMethod": "GET",
+    "headers": {
+      "Accept": "application/json",
+      "Host": "abc123.execute-api.us-west-2.amazonaws.com"
+    },
+    "queryStringParameters": {
+      "storeId": "test-store-id"
+    },
+    "pathParameters": {
+      "proxy": "listings"
+    },
+    "requestContext": {
+      "resourcePath": "/{proxy+}",
+      "httpMethod": "GET",
+      "requestId": "test-request-id",
+      "stage": "prod",
+      "requestTimeEpoch": 1428582896000,
+      "identity": {
+        "sourceIp": "127.0.0.1"
+      },
+      "domainName": "abc123.execute-api.us-west-2.amazonaws.com",
+      "apiId": "abc123"
+    },
+    "body": null,
+    "isBase64Encoded": false
+  },
+  
+  "withAuth": {
+    "resource": "/{proxy+}",
+    "path": "/listings",
+    "httpMethod": "POST",
+    "headers": {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer eyJraWQiOiJ...",
+      "Host": "abc123.execute-api.us-west-2.amazonaws.com"
+    },
+    "queryStringParameters": null,
+    "pathParameters": {
+      "proxy": "listings"
+    },
+    "requestContext": {
+      "resourcePath": "/{proxy+}",
+      "httpMethod": "POST",
+      "requestId": "test-request-id",
+      "stage": "prod",
+      "requestTimeEpoch": 1428582896000,
+      "identity": {
+        "sourceIp": "127.0.0.1"
+      },
+      "domainName": "abc123.execute-api.us-west-2.amazonaws.com",
+      "apiId": "abc123"
+    },
+    "body": "{\"name\":\"Test Item\",\"description\":\"Test\",\"price\":10,\"category\":\"test\",\"storeId\":\"test-store\"}",
+    "isBase64Encoded": false
+  }
+}
+
