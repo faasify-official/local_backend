@@ -2,10 +2,10 @@
 // If you need more information about configurations or implementing the sample code, visit the AWS docs:
 // https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/getting-started.html
 
-import {
+const {
     SecretsManagerClient,
     GetSecretValueCommand,
-  } from "@aws-sdk/client-secrets-manager";
+  } = require("@aws-sdk/client-secrets-manager");
   
 const REGION = process.env.AWS_REGION || 'us-west-2'
 // Name of the secret you created in the console
