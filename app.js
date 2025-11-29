@@ -20,6 +20,7 @@ app.use('/reviews', require('./routes/reviews'))
 app.use('/subscriptions', require('./routes/subscriptions'))
 app.use('/payments', require('./routes/payments'))
 app.use('/chats', require('./routes/chats'))
+app.use('/upload', require('./routes/upload'))
 
 // Health check
 app.get('/health', (req, res) => {

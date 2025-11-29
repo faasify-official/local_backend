@@ -1,46 +1,62 @@
-// Use this code snippet in your app.
-// If you need more information about configurations or implementing the sample code, visit the AWS docs:
-// https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/getting-started.html
-
 const {
-    SecretsManagerClient,
-    GetSecretValueCommand,
-  } = require("@aws-sdk/client-secrets-manager");
-  
-const REGION = process.env.AWS_REGION || 'us-west-2'
-// Name of the secret you created in the console
-const SECRET_NAME = process.env.APP_SECRET_NAME || 'faasify/local-backend'
+  SecretsManagerClient,
+  GetSecretValueCommand,
+} = require("@aws-sdk/client-secrets-manager");
 
-const client = new SecretsManagerClient({ region: REGION })
+const REGION = process.env.AWS_REGION || 'us-west-2';
 
-let cache = null
-
-async function loadSecrets () {
-  // simple in-memory cache so we don't call Secrets Manager every time
-  if (cache) return cache
-
-  // Local fallback: use .env directly if you want
-  if (process.env.USE_LOCAL_ENV === 'true') {
-    cache = {
-      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
-      JWT_SECRET: process.env.JWT_SECRET,
-      COGNITO_CLIENT_SECRET: process.env.COGNITO_CLIENT_SECRET,
-    }
-    return cache
+// Create client with caching
+let client = null;
+function getClient() {
+  if (!client) {
+    client = new SecretsManagerClient({ region: REGION });
   }
-
-  const data = await client.send(
-    new GetSecretValueCommand({ SecretId: SECRET_NAME })
-  )
-
-  const secretString = data.SecretString
-  cache = JSON.parse(secretString)
-  return cache
+  return client;
 }
 
-async function getSecret (key) {
-  const secrets = await loadSecrets()
-  return secrets[key]
+// Cache for secrets (optional - can be removed if you want fresh secrets each time)
+let cache = null;
+
+async function getSecret(secretName, key) {
+  try {
+    // Check cache first (if USE_LOCAL_ENV is true, use env vars)
+    if (process.env.USE_LOCAL_ENV === 'true') {
+      // Fallback to environment variables
+      const envKey = process.env[key] || process.env[secretName + '_' + key];
+      if (envKey) {
+        return envKey;
+      }
+    }
+
+    // Use cache if available
+    if (cache && cache[secretName] && cache[secretName][key]) {
+      return cache[secretName][key];
+    }
+
+    const command = new GetSecretValueCommand({
+      SecretId: secretName
+    });
+
+    const response = await getClient().send(command);
+    const secretObject = JSON.parse(response.SecretString);
+
+    // Cache the result
+    if (!cache) cache = {};
+    if (!cache[secretName]) cache[secretName] = {};
+    cache[secretName][key] = secretObject[key];
+
+    return secretObject[key];
+  } catch (error) {
+    console.error("SecretsManager error:", error);
+    
+    // Fallback to environment variable if Secrets Manager fails
+    if (process.env[key] || process.env[secretName + '_' + key]) {
+      console.warn(`Using environment variable fallback for ${key}`);
+      return process.env[key] || process.env[secretName + '_' + key];
+    }
+    
+    throw error;
+  }
 }
 
-module.exports = { getSecret }
+module.exports = { getSecret };

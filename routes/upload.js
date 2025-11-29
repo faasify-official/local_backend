@@ -3,13 +3,14 @@ const router = express.Router();
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const crypto = require('crypto');
+const multer = require('multer');
 const { verifyToken } = require('../utils/jwt');
 
 const REGION = process.env.AWS_REGION;
-const BUCKET = process.env.S3_BUCKET;
+const BUCKET = process.env.S3_BUCKET;          // e.g. faasify-item-images
 const CLOUDFRONT_URL = process.env.CLOUDFRONT_URL;
 
-// Validate environment variables
+// --- sanity check ---
 if (!REGION || !BUCKET || !CLOUDFRONT_URL) {
   console.error('Missing required environment variables for S3 upload:');
   console.error('AWS_REGION:', REGION ? '✓' : '✗');
@@ -19,42 +20,55 @@ if (!REGION || !BUCKET || !CLOUDFRONT_URL) {
 
 const s3 = new S3Client({ region: REGION });
 
-// Map file extensions to proper MIME types
+// Multer: keep uploaded file in memory
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5 MB
+  },
+});
+
+// Map file extensions to proper MIME types (used by /upload-url endpoint)
 const getContentType = (ext) => {
   const mimeMap = {
-    'jpg': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'png': 'image/png',
-    'gif': 'image/gif',
-    'webp': 'image/webp',
-    'svg': 'image/svg+xml',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    svg: 'image/svg+xml',
   };
   return mimeMap[ext.toLowerCase()] || 'image/jpeg';
 };
 
-// Server-side upload endpoint (avoids CORS issues)
-router.post('/', async (req, res) => {
+/**
+ * POST /upload
+ * Body: multipart/form-data with field "image"
+ * Returns: { imageUrl, cloudFrontUrl, s3Url }
+ */
+router.post('/', upload.single('image'), async (req, res) => {
   try {
-    // Verify authentication
-    const user = verifyToken(req);
+    // auth
+    const user = await verifyToken(req);
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     if (!REGION || !BUCKET || !CLOUDFRONT_URL) {
-      return res.status(500).json({ error: 'S3 configuration is missing. Please check environment variables.' });
+      return res.status(500).json({
+        error: 'S3 configuration is missing. Please check environment variables.',
+      });
     }
 
-    // Get file from request body (should be binary)
-    const fileBuffer = req.body;
-    if (!fileBuffer || fileBuffer.length === 0) {
-      return res.status(400).json({ error: 'No file data provided' });
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    // Get content type from headers
-    const contentType = req.headers['content-type'] || 'image/jpeg';
-    
-    // Determine extension from content type
+    const fileBuffer = file.buffer;      // 🔥 actual binary
+    const contentType = file.mimetype;   // e.g. image/jpeg
+
+    // derive extension from mimetype
     let ext = 'jpg';
     if (contentType.includes('png')) ext = 'png';
     else if (contentType.includes('gif')) ext = 'gif';
@@ -64,7 +78,7 @@ router.post('/', async (req, res) => {
 
     const key = `items/${crypto.randomUUID()}.${ext}`;
 
-    // Upload to S3 - try with public-read ACL first, fallback if ACLs are disabled
+    // upload to S3
     let command;
     try {
       command = new PutObjectCommand({
@@ -72,36 +86,32 @@ router.post('/', async (req, res) => {
         Key: key,
         Body: fileBuffer,
         ContentType: contentType,
-        ACL: 'public-read' // Make object publicly readable
+        // ACL: 'public-read', // optional; not needed with bucket owner enforced + public policy
       });
       await s3.send(command);
     } catch (aclError) {
-      // If ACL fails (bucket has ACLs disabled), try without ACL
-      // You'll need to use Origin Access Control (OAC) in CloudFront instead
+      // if ACL not allowed (because ACLs disabled), retry without ACL
       if (aclError.name === 'InvalidRequest' || aclError.message?.includes('ACL')) {
         command = new PutObjectCommand({
           Bucket: BUCKET,
           Key: key,
           Body: fileBuffer,
-          ContentType: contentType
+          ContentType: contentType,
         });
         await s3.send(command);
       } else {
-        throw aclError; // Re-throw if it's a different error
+        throw aclError;
       }
     }
-    
-    // Return both CloudFront and S3 URLs
+
     const cloudFrontUrl = `${CLOUDFRONT_URL}/${key}`;
     const s3Url = `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
-    
-    // Since CloudFront is having permission issues, use S3 URL directly
-    // S3 URL will work if bucket is public or has proper permissions
-    // CloudFront URL is included for future use once OAC is properly configured
-    res.json({ 
-      imageUrl: s3Url, // Use S3 URL directly since CloudFront has 403 issues
-      cloudFrontUrl: cloudFrontUrl, // Keep for reference
-      s3Url: s3Url
+
+    // for now you’ll use imageUrl/s3Url in the app
+    res.json({
+      imageUrl: s3Url,
+      cloudFrontUrl,
+      s3Url,
     });
   } catch (err) {
     console.error('Error uploading image:', err);
@@ -109,16 +119,19 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Keep the old endpoint for backward compatibility (but it has CORS issues)
+/**
+ * GET /upload/upload-url
+ * (old presigned URL endpoint – optional, keep if you still use it)
+ */
 router.get('/upload-url', async (req, res) => {
   try {
     if (!REGION || !BUCKET || !CLOUDFRONT_URL) {
-      return res.status(500).json({ error: 'S3 configuration is missing. Please check environment variables.' });
+      return res.status(500).json({
+        error: 'S3 configuration is missing. Please check environment variables.',
+      });
     }
 
     const ext = (req.query.ext || 'jpg').toLowerCase();
-    
-    // Normalize extension (jpeg -> jpg for consistency)
     const normalizedExt = ext === 'jpeg' ? 'jpg' : ext;
 
     const key = `items/${crypto.randomUUID()}.${normalizedExt}`;
