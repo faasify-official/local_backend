@@ -36,6 +36,23 @@ SUBSCRIPTIONS_TABLE=SubscriptionsTable
 ```
 - Match these to your actual DynamoDB table names
 
+### Redis / Cart cache
+```
+REDIS_HOST=your-cache-endpoint
+REDIS_PORT=6379
+REDIS_PASSWORD=optional-if-auth-enabled
+REDIS_DB=0
+REDIS_USE_TLS=true
+REDIS_TLS_REJECT_UNAUTHORIZED=true
+CART_TTL_SECONDS=604800
+CART_SORT_KEY=storeId
+CART_DEFAULT_SCOPE=default
+```
+- `REDIS_*` values let the Lambda bundle talk to ElastiCache; leave `REDIS_USE_TLS=false` for local Redis.
+- `REDIS_HOST` accepts the ElastiCache primary endpoint; `REDIS_ENDPOINT` is also honored for backward compatibility.
+- `CART_TTL_SECONDS` controls how long carts stay in Redis (0 disables cache writes if you need a hotfix).
+- `CART_SORT_KEY` is only needed if your `CartTable` has a sort key (e.g., `storeId`); `CART_DEFAULT_SCOPE` fills it when requests do not pass a store id.
+
 ## Optional Variables
 
 ### CORS Configuration
