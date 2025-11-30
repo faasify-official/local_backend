@@ -33,8 +33,14 @@ REVIEWS_TABLE=ReviewsTable
 CHATS_TABLE=ChatsTable
 MESSAGES_TABLE=MessagesTable
 SUBSCRIPTIONS_TABLE=SubscriptionsTable
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=examplepassword
+CART_CACHE_TTL_SECONDS=3600
 ```
 - Match these to your actual DynamoDB table names
+- Redis values power the cart cache (ElastiCache in prod, local Docker in dev)
+> Cart table schema: PK `userId` (String) and SK `itemId` (String). Using a different sort key (e.g., `storeId`) will produce DynamoDB key errors.
 
 ## Optional Variables
 
@@ -87,6 +93,7 @@ MESSAGES_TABLE=MessagesTable
 SUBSCRIPTIONS_TABLE=SubscriptionsTable
 CORS_ORIGINS=*
 STRIPE_SECRET_KEY=sk_test_your_stripe_key_here
+CART_CACHE_TTL_SECONDS=3600
 ```
 
 ## How to Set in AWS Lambda
