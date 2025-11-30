@@ -7,6 +7,10 @@ const { verifyToken } = require('../utils/jwt')
 const router = express.Router()
 const ITEMS_TABLE = process.env.ITEMS_TABLE || 'ItemsTable'
 
+const SUBSCRIPTIONS_TABLE = process.env.SUBSCRIPTIONS_TABLE || 'SubscriptionsTable'
+
+const { sendSms } = require('../utils/sns')
+
 // Add item to storefront
 router.post('/', async (req, res) => {
   try {
@@ -66,6 +70,9 @@ router.post('/', async (req, res) => {
         Item: item,
       })
     )
+
+    // 🔔 Notify subscribers (email + SMS)
+    await notifySubscribersForNewItem(storeId, item)
 
     res.status(201).json({
       message: 'Item added successfully',
@@ -326,6 +333,62 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({ error: `Failed to delete item: ${error.message}` })
   }
 })
+
+/**
+ * Notify all subscribers when a new item is added
+ * - Respects notifyEmail / notifySms flags on the subscription
+ * - Uses SNS to send SMS messages
+ */
+async function notifySubscribersForNewItem(storeId, item) {
+  try {
+    console.log('Notifying subscribers for storeId:', storeId)
+
+    const result = await docClient.send(
+      new QueryCommand({
+        TableName: SUBSCRIPTIONS_TABLE,
+        KeyConditionExpression: 'storeId = :storeId',
+        ExpressionAttributeValues: {
+          ':storeId': storeId,
+        },
+      })
+    )
+
+    const subscriptions = result.Items || []
+    console.log('Found subscriptions:', subscriptions.length)
+
+    for (const sub of subscriptions) {
+      console.log(sub)
+      const notifyEmail = sub.notifyEmail !== false // default: true if missing
+      const notifySms = !!sub.notifySms
+      const buyerEmail = sub.buyerEmail
+      const phoneNumber = sub.phoneNumber
+
+      // --- Email notifications (existing / future) ---
+      if (notifyEmail) {
+        // If you already have email notification logic somewhere else,
+        // call it here, for example:
+        //
+        // await sendEmailNotification(buyerEmail, item)
+        //
+        // For now, we just log:
+        console.log('Would send email notification to', buyerEmail)
+      }
+
+      // --- SMS notifications via SNS ---
+      if (notifySms && phoneNumber) {
+        const message = `New listing added in a store you follow: ${item.name} for $${item.price}`
+
+        try {
+          await sendSms(phoneNumber, message)
+        } catch (smsError) {
+          console.error('Failed to send SMS to', phoneNumber, smsError)
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error notifying subscribers for new item:', error)
+  }
+}
 
 module.exports = router
 
