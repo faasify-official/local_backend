@@ -1,144 +1,90 @@
 const express = require('express')
-const { docClient } = require('../utils/dynamodb')
-const { GetCommand, PutCommand, DeleteCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb')
 const { verifyToken } = require('../utils/jwt')
+const {
+  getCartForUser,
+  addItemToCart,
+  updateItemQuantity,
+  removeItemFromCart,
+  clearCartForUser,
+} = require('../services/cartService')
 
 const router = express.Router()
-const CART_TABLE = process.env.CART_TABLE || 'CartTable'
 
-// Get user's cart
-router.get('/', async (req, res) => {
+// Middleware to ensure callers are authenticated and to attach the Cognito user id
+const requireAuth = async (req, res, next) => {
   try {
     const user = await verifyToken(req)
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
-
-    // Get all cart items for user
-    const result = await docClient.send(
-      new ScanCommand({
-        TableName: CART_TABLE,
-        FilterExpression: 'userId = :userId',
-        ExpressionAttributeValues: {
-          ':userId': user.userId,
-        },
-      })
-    )
-
-    res.status(200).json({
-      items: result.Items || [],
-    })
+    req.userId = user.userId
+    next()
   } catch (error) {
-    console.error('Error getting cart:', error)
-    res.status(500).json({ error: 'Failed to get cart' })
+    console.error('Auth error for cart route:', error)
+    res.status(401).json({ error: 'Unauthorized' })
+  }
+}
+
+// Normalize cart service errors into HTTP responses
+const handleError = (res, error) => {
+  console.error('Cart route error:', error)
+  const status = error.statusCode || 500
+  res.status(status).json({ error: error.message || 'Cart request failed' })
+}
+
+router.use(requireAuth)
+
+// Get the authenticated user's cart with fresh product metadata
+router.get('/items', async (req, res) => {
+  try {
+    const cart = await getCartForUser(req.userId)
+    res.status(200).json(cart)
+  } catch (error) {
+    handleError(res, error)
   }
 })
 
-// Add item to cart
-router.post('/', async (req, res) => {
+// Add or update an item in the cart while enforcing single-storefront carts
+router.post('/items', async (req, res) => {
   try {
-    const user = await verifyToken(req)
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' })
-    }
-
-    const { productId, quantity = 1, storeId } = req.body
-
-    if (!productId || !storeId) {
-      return res.status(400).json({ error: 'Missing required fields: productId, storeId' })
-    }
-
-    const cartItem = {
-      userId: user.userId,
-      storeId,
-      productId,
-      quantity,
-      updatedAt: new Date().toISOString(),
-    }
-
-    await docClient.send(
-      new PutCommand({
-        TableName: CART_TABLE,
-        Item: cartItem,
-      })
-    )
-
-    res.status(200).json({
-      message: 'Item added to cart',
-      item: cartItem,
-    })
+    const { itemId, quantity = 1 } = req.body || {}
+    const cart = await addItemToCart(req.userId, itemId, quantity)
+    res.status(200).json(cart)
   } catch (error) {
-    console.error('Error adding to cart:', error)
-    res.status(500).json({ error: 'Failed to add to cart' })
+    handleError(res, error)
   }
 })
 
-// Update cart item
-router.put('/:storeId/:productId', async (req, res) => {
+// Update quantity for an item (quantity of 0 deletes the row)
+router.patch('/items/:itemId', async (req, res) => {
   try {
-    const user = await verifyToken(req)
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' })
-    }
-
-    const { storeId, productId } = req.params
-    const { quantity } = req.body
-
-    if (quantity < 1) {
-      return res.status(400).json({ error: 'Quantity must be at least 1' })
-    }
-
-    const cartItem = {
-      userId: user.userId,
-      storeId,
-      productId,
-      quantity,
-      updatedAt: new Date().toISOString(),
-    }
-
-    await docClient.send(
-      new PutCommand({
-        TableName: CART_TABLE,
-        Item: cartItem,
-      })
-    )
-
-    res.status(200).json({
-      message: 'Cart item updated',
-      item: cartItem,
-    })
+    const { itemId } = req.params
+    const { quantity = 1 } = req.body || {}
+    const cart = await updateItemQuantity(req.userId, itemId, quantity)
+    res.status(200).json(cart)
   } catch (error) {
-    console.error('Error updating cart:', error)
-    res.status(500).json({ error: 'Failed to update cart' })
+    handleError(res, error)
   }
 })
 
-// Remove item from cart
-router.delete('/:storeId/:productId', async (req, res) => {
+// Remove a specific item from the cart
+router.delete('/items/:itemId', async (req, res) => {
   try {
-    const user = await verifyToken(req)
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' })
-    }
-
-    const { storeId, productId } = req.params
-
-    await docClient.send(
-      new DeleteCommand({
-        TableName: CART_TABLE,
-        Key: {
-          userId: user.userId,
-          storeId,
-        },
-      })
-    )
-
-    res.status(200).json({
-      message: 'Item removed from cart',
-    })
+    const { itemId } = req.params
+    const cart = await removeItemFromCart(req.userId, itemId)
+    res.status(200).json(cart)
   } catch (error) {
-    console.error('Error removing from cart:', error)
-    res.status(500).json({ error: 'Failed to remove from cart' })
+    handleError(res, error)
+  }
+})
+
+// Clear the entire cart for the current user
+router.delete('/items', async (req, res) => {
+  try {
+    const cart = await clearCartForUser(req.userId)
+    res.status(200).json(cart)
+  } catch (error) {
+    handleError(res, error)
   }
 })
 

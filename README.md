@@ -13,6 +13,7 @@ npm install
 ```bash
 cp .env.example .env
 ```
+Make sure to fill in the Redis settings (`REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`) so the cart cache can run locally.
 
 ### 3. Configure AWS Cognito (Required for Auth)
 
@@ -60,6 +61,15 @@ STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
 PORT=3000
 ```
 
+### 5. Run Redis locally for the cart cache
+```bash
+docker run --name dev-redis -p 6379:6379 -e REDIS_PASSWORD=examplepassword redis
+```
+The cart API will use these values to mirror the ElastiCache setup used in production.
+
+### Cart table schema (required)
+Create `CartTable` with **partition key** `userId` (String) and **sort key** `itemId` (String). The service writes keys `{ userId, itemId }` and stores `storeId` and `quantity` as attributes, so a different key layout (e.g., sort key `storeId`) will cause DynamoDB errors like “The provided key element does not match the schema.”
+
 ## Running
 
 ```bash
@@ -75,7 +85,7 @@ All routes match the Lambda backend:
 - **Auth**: `/auth/register`, `/auth/login`, `/auth/profile`
 - **Storefronts**: `/storefronts`, `/storefronts/:storeId`, `/storefronts/my`
 - **Listings**: `/listings` (GET with `?storeId=...`, POST to add items)
-- **Cart**: `/cart` (GET, POST, PUT, DELETE)
+- **Cart**: `/cart/items` (GET, POST, PATCH, DELETE for single item, DELETE to clear)
 - **Orders**: `/orders` (GET, POST, GET `/:orderId`)
 - **Reviews**: `/reviews` (POST, GET `/product/:productId`, GET `/:reviewId`)
 
@@ -112,4 +122,9 @@ Cognito tokens are JWTs containing:
 - Make sure your AWS credentials and Cognito configuration are set in `.env`
 - The server includes CORS middleware for frontend development
 - All routes now use Cognito tokens for authentication
+- Cart persistence uses DynamoDB as the source of truth with Redis caching so carts survive refreshes in both dev and prod environments.
+
+## Cart Flow (Dev & Prod)
+- Frontend → `/cart/...` on API Gateway → Cart Lambda (VPC) → Redis cache + DynamoDB `CART_TABLE` + `ITEMS_TABLE`.
+- Local dev → Express `/cart/...` → local Redis Docker + DynamoDB/localstack → shared cart service logic.
 
