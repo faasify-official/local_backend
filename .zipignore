@@ -1,0 +1,15 @@
+# Files to exclude from deployment ZIP
+# (Lambda doesn't need these)
+
+.git
+.gitignore
+.env
+*.log
+.DS_Store
+deployment.zip
+README.md
+DEPLOY.md
+server.js
+package-lock.json
+node_modules/.cache
+

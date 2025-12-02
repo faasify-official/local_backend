@@ -6,20 +6,27 @@
   "type": "commonjs",
   "scripts": {
     "dev": "node server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "package": "node package-deploy.js"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.936.0",
     "@aws-sdk/client-dynamodb": "^3.592.0",
-    "@aws-sdk/client-s3": "^3.939.0",
+    "@aws-sdk/client-s3": "^3.940.0",
+    "@aws-sdk/client-secrets-manager": "^3.940.0",
+    "@aws-sdk/client-sns": "^3.940.0",
     "@aws-sdk/lib-dynamodb": "^3.592.0",
-    "@aws-sdk/s3-request-presigner": "^3.939.0",
+    "@aws-sdk/s3-request-presigner": "^3.940.0",
+    "@vendia/serverless-express": "^4.12.6",
+    "aws-serverless-express": "^3.4.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "ioredis": "^5.8.2",
     "jsonwebtoken": "^9.0.2",
     "jwk-to-pem": "^2.0.7",
+    "multer": "^1.4.5-lts.1",
     "stripe": "^19.3.1",
     "uuid": "^9.0.1"
   }

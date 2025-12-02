@@ -10,6 +10,7 @@ const {
   AdminGetUserCommand,
 } = require('@aws-sdk/client-cognito-identity-provider')
 const { verifyToken } = require('../utils/jwt')
+const { getSecret } = require('../utils/secrets')
 
 const router = express.Router()
 const USERS_TABLE = process.env.USERS_TABLE || 'UsersTable'
@@ -22,6 +23,15 @@ const cognito = new CognitoIdentityProviderClient({
 const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID
 const COGNITO_CLIENT_ID = process.env.COGNITO_CLIENT_ID
 const COGNITO_CLIENT_SECRET = process.env.COGNITO_CLIENT_SECRET
+
+// get cognito client secret from AWS secrets manager
+async function getCognitoClientSecret () {
+  if (COGNITO_CLIENT_SECRET) return COGNITO_CLIENT_SECRET
+
+  // this looks up the key "COGNITO_CLIENT_SECRET" in your Secrets Manager JSON
+  COGNITO_CLIENT_SECRET = await getSecret('COGNITO_CLIENT_SECRET')
+  return COGNITO_CLIENT_SECRET
+}
 
 if (!COGNITO_USER_POOL_ID || !COGNITO_CLIENT_ID) {
   console.warn('WARNING: COGNITO_USER_POOL_ID or COGNITO_CLIENT_ID not set in .env')
@@ -161,8 +171,12 @@ router.post('/login', async (req, res) => {
         PASSWORD: password,
       }
 
+      // get client secret from AWS secrets manager (or .env if USE_LOCAL_ENV is true)
+      const clientSecret = await getCognitoClientSecret();
+
       // Add SECRET_HASH if client secret is configured
-      const secretHash = computeSecretHash(email.toLowerCase(), COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET)
+      // const secretHash = computeSecretHash(email.toLowerCase(), COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET)
+      const secretHash = computeSecretHash(email.toLowerCase(), COGNITO_CLIENT_ID, clientSecret)
       if (secretHash) {
         authParams.SECRET_HASH = secretHash
       }

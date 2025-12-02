@@ -31,12 +31,36 @@ router.post('/subscribe', async (req, res) => {
       return res.status(403).json({ error: 'Forbidden: Only buyers can subscribe to storefronts' })
     }
 
-    const { storeId } = req.body
+    // const { storeId } = req.body
+    const { storeId, notifyEmail, notifySms, phoneNumber } = req.body
 
     // Validation
     if (!storeId) {
       return res.status(400).json({
         error: 'Missing required field: storeId',
+      })
+    }
+
+    // Determine notification preferences
+    // Default: email = true if not provided (for backward compatibility)
+    const emailPref =
+      typeof notifyEmail === 'boolean'
+        ? notifyEmail
+        : true
+
+    const smsPref = !!notifySms
+
+    // Must pick at least one channel
+    if (!emailPref && !smsPref) {
+      return res.status(400).json({
+        error: 'At least one notification channel (email or SMS) must be selected',
+      })
+    }
+
+    // Phone is required if SMS is enabled
+    if (smsPref && (!phoneNumber || !phoneNumber.trim())) {
+      return res.status(400).json({
+        error: 'Phone number is required when SMS notifications are enabled',
       })
     }
 
@@ -65,11 +89,24 @@ router.post('/subscribe', async (req, res) => {
       console.error('Error checking existing subscription:', error)
     }
 
-    // Create subscription
+    // // Create subscription
+    // const subscription = {
+    //   storeId,
+    //   buyerEmail,
+    //   subscribedAt: new Date().toISOString(),
+    // }
+
+    // Create subscription with notification preferences
     const subscription = {
       storeId,
       buyerEmail,
       subscribedAt: new Date().toISOString(),
+      notifyEmail: emailPref,
+      notifySms: smsPref,
+    }
+
+    if (smsPref && phoneNumber) {
+      subscription.phoneNumber = phoneNumber.trim()
     }
 
     await docClient.send(
